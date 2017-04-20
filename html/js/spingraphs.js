@@ -63,9 +63,13 @@ function updateZoomLock(newBool) {
 // code to add filters
 function sendAddFilterCommand(nodeId) {
     var node = nodes.get(nodeId);
-    filterList.push(node.address);
+    if ("ips" in node) {
+        for (var i = 0; i < node.ips.length; i++) {
+            filterList.push(node.ips[i]);
+        }
+    }
 
-    sendCommand("add_filter", node.address); // talk to websocket
+    sendCommand("add_filter", nodeId); // talk to websocket
     deleteNodeAndConnectedNodes(node);
 }
 
@@ -132,7 +136,7 @@ function initGraphs() {
             var argument = {};
             var node = nodes.get(selectedNodeId);
             var newname = name.val();
-            argument['address'] = node.address;
+            argument['node_id'] = selectedNodeId;
             argument['name'] = newname;
             sendCommand("add_name", argument); // talk to Websocket
 
@@ -261,6 +265,9 @@ function initGraphs() {
     showGraph(traffic_dataset);
     showNetwork();
     initTrafficDataView();
+
+    // clean up every X seconds
+    setInterval(cleanNetwork, 5000);
 }
 
 //
@@ -374,7 +381,6 @@ function showNetwork() {
 
 function updateNodeInfo(nodeId) {
     var node = nodes.get(nodeId);
-    writeToScreen("node", "node: " + node.address);
     writeToScreen("trafficcount", "Connections seen: " + node.count);
     writeToScreen("trafficsize", "Traffic size: " + node.size);
     writeToScreen("ipaddress", "");
@@ -413,10 +419,10 @@ function nodeSelected(event) {
             // hmm. misschien we should actually remove the node and
             // let the next occurrence take care of presentation?
             if (node.blocked) {
-                sendCommandDNS("stopblockdata", selectedNodeId);
+                sendCommand("stopblockdata", selectedNodeId);
                 node.blocked = false;
             } else {
-                sendCommandDNS("blockdata", selectedNodeId);
+                sendCommand("blockdata", selectedNodeId);
                 node.blocked = true;
             }
             nodes.update(node);
@@ -507,13 +513,18 @@ function updateNode(node) {
     //var colour = node.blocked ? colour_blocked : colour_recent;
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
-    if (node.mac) {
+    if (node.name) {
+        label = node.name;
+    } else if (node.mac) {
         label = node.mac;
-        node.color = colour_src;
     } else if (domains.length > 0) {
         label = node.domains[0];
     } else if (ips.length > 0) {
         label = node.ips[0];
+    }
+
+    if (node.mac) {
+        node.color = colour_src;
     }
 
     enode.label = label;
@@ -533,13 +544,18 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
     var blocked = type == "blocked";
-    if (node.mac) {
+    if (node.name) {
+        label = node.name;
+    } else if (node.mac) {
         label = node.mac;
-        colour = colour_src;
     } else if (domains.length > 0) {
         label = node.domains[0];
     } else if (ips.length > 0) {
         label = node.ips[0];
+    }
+
+    if (node.mac) {
+        colour = colour_src;
     }
 
     if (blocked) {
@@ -580,7 +596,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
 
 
 function oldaddNode(timestamp, ip, scale, count, size, lwith, type) {
-    //sendCommandDNS("ip2hostname", ip);
+    //sendCommand("ip2hostname", ip);
     var existing = getNodeId(ip);
     // By default, the ip/mac is the node name, but if
     // it is present in the user-set nodeNames dict, use that
@@ -767,5 +783,22 @@ function addBlocked(timestamp, from, to) {
         network.fit({
             duration: 0
         });
+    }
+}
+
+function cleanNetwork() {
+    var now = Math.floor(Date.now() / 1000);
+    var delete_before = now - 600;
+    var unhighlight_before = now - 10;
+
+    var ids = nodes.getIds();
+    for (var i = 0; i < ids.length; i++) {
+        var node = nodes.get(ids[i]);
+        if (node.lastseen < delete_before) {
+            deleteNode(node, true);
+        } else if (node.lastseen < unhighlight_before && node["color"] == colour_recent) {
+            node["color"] = colour_dst;
+            nodes.update(node);
+        }
     }
 }

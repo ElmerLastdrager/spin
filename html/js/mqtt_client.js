@@ -13,25 +13,6 @@ function init() {
     client.connect({onSuccess:onTrafficOpen});
 }
 
-// called when the client connects
-/*
-function origonConnect() {
-    alert("Connect")
-    // Once a connection has been made, make a subscription and send a message.
-    console.log("onConnect");
-    client.subscribe("SPIN-output-all");
-    message = new Paho.MQTT.Message("Hello");
-    message.destinationName = "SPIN-Config";
-    client.send(message);
-}
-
-// called when the client loses its connection
-function origonConnectionLost(responseObject) {
-    if (responseObject.errorCode !== 0) {
-        console.log("onConnectionLost:"+responseObject.errorMessage);
-    }
-}
-*/
 // called when a message arrives
 function origonMessageArrived(message) {
     //console.log("SPIN/traffic message:"+message.payloadString);
@@ -48,33 +29,7 @@ function sendCommand(command, argument) {
     var message = new Paho.MQTT.Message(json_cmd);
     message.destinationName = "SPIN/commands";
     client.send(message);
-    console.log("Sent: " + json_cmd)
-}
-
-function sendCommand(command, argument) {
-    var cmd = {}
-    cmd['command'] = command;
-    cmd['argument'] = argument;
-    //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
-
-    var json_cmd = JSON.stringify(cmd);
-    var message = new Paho.MQTT.Message(json_cmd);
-    message.destinationName = "SPIN/commands";
-    client.send(message);
-    console.log("Sent: " + json_cmd)
-}
-
-function sendCommandDNS(command, argument) {
-    var cmd = {}
-    cmd['command'] = command;
-    cmd['argument'] = argument;
-    //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
-
-    var json_cmd = JSON.stringify(cmd);
-    var message = new Paho.MQTT.Message(json_cmd);
-    message.destinationName = "SPIN/dnsnames";
-    client.send(message);
-    console.log("Sent: " + json_cmd)
+    console.log("Sent to SPIN/commands: " + json_cmd)
 }
 
 function writeToScreen(element, message) {
@@ -245,7 +200,7 @@ function handleTrafficMessage(data) {
             // some dummy data, ask for data update
             from_node = {};
             from_node.id = f['from'];
-            sendCommandDNS('missingNodeInfo', f['from']);
+            sendCommand('missingNodeInfo', f['from']);
             // what else?
         }
         var to_node = node_cache[f['to']];
@@ -253,7 +208,7 @@ function handleTrafficMessage(data) {
             // some dummy data, ask for data update
             to_node = {};
             to_node.id = f['to'];
-            sendCommandDNS('missingNodeInfo', f['to']);
+            sendCommand('missingNodeInfo', f['to']);
             // what else?
             // TODO send command
         }
@@ -270,7 +225,7 @@ function handleBlockedMessage(data) {
         // some dummy data, ask for data update
         from_node = {};
         from_node.id = data['from'];
-        sendCommandDNS('missingNodeInfo', data['from']);
+        sendCommand('missingNodeInfo', data['from']);
         // what else?
     }
     var to_node = node_cache[data['to']];
@@ -278,7 +233,7 @@ function handleBlockedMessage(data) {
         // some dummy data, ask for data update
         to_node = {};
         to_node.id = data['to'];
-        sendCommandDNS('missingNodeInfo', data['to']);
+        sendCommand('missingNodeInfo', data['to']);
         // what else?
         // TODO send command
     }
