@@ -14,13 +14,9 @@
 var traffic_dataset = new vis.DataSet([]);
 var graph2d_1;
 var selectedNodeId;
-// mapping of node names
-var nodeNames = {}
 // list of filters
 var filterList = [];
 // feed this data from websocket command
-//nodeNames["de:ad:be:ef:1e:e7"] = "kweenie";
-//nodeNames["1e:e7:be:ef:de:ad"] = "kweenie2";
 var zoom_locked = false;
 
 var colour_src = "#dddddd";
@@ -318,12 +314,10 @@ function showGraph(dataset) {
 // Network-view code
 //
 
-var nodeIds, shadowState, nodesArray, nodes, edgesArray, edges, network, curNodeId, curEdgeId;
+var shadowState, nodesArray, nodes, edgesArray, edges, network, curNodeId, curEdgeId;
 
 function showNetwork() {
     // mapping from ip to nodeId
-    nodeIds = {};
-
     shadowState = true;
 
     // start counting with one (is this internally handled?)
@@ -484,23 +478,6 @@ function updateBlockedButton() {
 
 */
 
-// Used in spinsocket.js
-function getNodeId(ip) {
-    var nodeName = ip;
-    if (ip in nodeNames) {
-        nodeName = nodeNames[ip];
-    }
-    if (ip in nodeIds) {
-        return nodeIds[ip];
-    } else {
-        return null;
-    }
-}
-
-function addNodeName(ip, name) {
-    nodeNames[ip] = name;
-}
-
 function updateNode(node) {
     if (!node) { return; }
     var enode = nodes.get(node.id);
@@ -525,13 +502,19 @@ function updateNode(node) {
 
     if (node.mac) {
         node.color = colour_src;
+    } else {
+        node.color = colour_recent;
     }
 
     enode.label = label;
     enode.ips = ips;
     enode.domains = domains;
-    //enode.color = colour;
+
     nodes.update(enode);
+
+    if (node.id == selectedNodeId) {
+        updateNodeInfo(node.id);
+    }
 }
 
 // Used in AddFlow()
@@ -556,10 +539,12 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
 
     if (node.mac) {
         colour = colour_src;
-    }
-
-    if (blocked) {
-        colour = colour_blocked;
+    } else {
+        if (blocked) {
+            colour = colour_blocked;
+        } else {
+            colour = colour_recent;
+        }
     }
 
     //alert("add node: " + node)
@@ -570,6 +555,8 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         enode.ips = ips;
         enode.domains = domains;
         enode.color = colour;
+        enode.blocked = blocked;
+        enode.lastseen = timestamp;
         nodes.update(enode);
     } else {
         // it's new
@@ -591,70 +578,6 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
                 }
             }
         });
-    }
-}
-
-
-function oldaddNode(timestamp, ip, scale, count, size, lwith, type) {
-    //sendCommand("ip2hostname", ip);
-    var existing = getNodeId(ip);
-    // By default, the ip/mac is the node name, but if
-    // it is present in the user-set nodeNames dict, use that
-    if (existing) {
-        var node = nodes.get(existing)
-        //alert("node: " + node + " color: " + node['color'] + " size: " + node.size);
-        // Set the color to mark 'recent'
-
-        node["size"] += size;
-        node["count"] += count;
-        node["lastseen"] = timestamp;
-
-        if (scale) {
-            node["color"] = colour_recent;
-            node["value"] = node["value"] + size;
-        }
-        nodes.update(node);
-    } else {
-        var nodeName = ip;
-        if (ip in nodeNames) {
-            nodeName = nodeNames[ip];
-        }
-        var c;
-        switch (type) {
-        case "traffic":
-            c = colour_recent;
-            break;
-        case "source":
-            c = colour_src;
-            break;
-        case "blocked":
-            c = colour_blocked;
-            break;
-        default:
-            c = "#000000";
-        }
-        nodeIds[ip] = curNodeId;
-        nodes.add({
-            id: curNodeId,
-            address: ip, // (note: this can also be mac addr)
-            label: nodeName,
-            color: c,
-            value: size,
-            count: count,
-            size: size,
-            lastseen: timestamp,
-            scaling: {
-                min: 1,
-                label: {
-                    enabled: true
-                }
-            }
-        });
-        curNodeId += 1;
-        //sendCommand("arp2dhcpname", ip) // talk to Websocket
-    }
-    if (selectedNodeId && selectedNodeId == existing) {
-        updateNodeInfo(selectedNodeId);
     }
 }
 
@@ -698,11 +621,10 @@ function deleteNodeAndConnectedNodes(node) {
 // Remove a node from the screen
 // If deleteEdges is true, also remove all edges connected to this node
 function deleteNode(node, deleteNodeEdges) {
-    delete nodeIds[node.address];
-    nodes.remove(node.id);
     if (deleteNodeEdges) {
         deleteEdges(node.id);
     }
+    nodes.remove(node.id);
 }
 
 // Returns a list of all nodeIds that have an edge to the given nodeId
@@ -789,7 +711,7 @@ function addBlocked(timestamp, from, to) {
 function cleanNetwork() {
     var now = Math.floor(Date.now() / 1000);
     var delete_before = now - 600;
-    var unhighlight_before = now - 10;
+    var unhighlight_before = now - 30;
 
     var ids = nodes.getIds();
     for (var i = 0; i < ids.length; i++) {

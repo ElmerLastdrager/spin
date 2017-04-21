@@ -160,8 +160,6 @@ function handle_command(command, argument)
   elseif command == "missingNodeInfo" then
     -- just publish it again?
     local node = node_cache:get_by_id(tonumber(argument))
-    print("[XX] WAS ASKED FOR INFO ABOUT NODE " .. argument .. "(type " .. type(argument) .. ")")
-
     publish_node_update(node)
     response = nil
   elseif command == "blockdata" then
