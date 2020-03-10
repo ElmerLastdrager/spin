@@ -1,6 +1,7 @@
 #include <libmnl/libmnl.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 #include <time.h>
+#include <endian.h>
 
 #include "core2conntrack.h"
 #include "ipl.h"
@@ -36,8 +37,9 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     memcpy((pkt_info->src_addr) + 12, &tmp, 4);
     tmp = nfct_get_attr_u32(ct, ATTR_IPV4_DST);
     memcpy((pkt_info->dest_addr) + 12, &tmp, 4);
-    pkt_info->src_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC);
-    pkt_info->dest_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST);
+    /* nfct ports are big endian (network byte order), correct */
+    pkt_info->src_port = be16toh(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC));
+    pkt_info->dest_port = be16toh(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST));
     pkt_info->payload_size = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_BYTES);
     // We count both the orig and the repl for size and packet numbers
     pkt_info->payload_size = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_BYTES);
@@ -58,8 +60,9 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     pkt_info->payload_size += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_BYTES);
     pkt_info->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
     pkt_info->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
-    pkt_info->src_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC);
-    pkt_info->dest_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST);
+    /* nfct ports are big endian (network byte order), correct */
+    pkt_info->src_port = be16toh(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC));
+    pkt_info->dest_port = be16toh(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST));
     pkt_info->payload_offset = 0;
     pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
     pkt_info->icmp_type = nfct_get_attr_u8(ct, ATTR_ICMP_TYPE);
